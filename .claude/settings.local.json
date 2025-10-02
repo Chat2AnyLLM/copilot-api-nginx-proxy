@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//var/log/nginx/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
