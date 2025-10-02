@@ -1,0 +1,11 @@
+FROM nginx:alpine
+
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Copy SSL certificates (will be mounted from certs directory)
+# The certs directory should contain cert.pem and key.pem
+
+EXPOSE 4000
+
+CMD ["nginx", "-g", "daemon off;"]
