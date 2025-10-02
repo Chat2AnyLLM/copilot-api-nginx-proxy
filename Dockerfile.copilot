@@ -1,0 +1,14 @@
+FROM alpine:latest
+
+# Install Node.js and npm
+RUN apk add --no-cache nodejs npm
+
+# Set working directory
+WORKDIR /app
+
+# Accept GitHub token as environment variable
+ENV GITHUB_TOKEN=""
+ENV ACCOUNT_TYPE="enterprise"
+
+# Start the copilot-api service
+CMD npx copilot-api@latest start --port 4000 --github-token ${GITHUB_TOKEN} --account-type ${ACCOUNT_TYPE}

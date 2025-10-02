@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  copilot-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.copilot
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - ACCOUNT_TYPE=enterprise
+    networks:
+      - copilot-network
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - copilot-api
+    networks:
+      - copilot-network
+    restart: unless-stopped
+
+networks:
+  copilot-network:
+    driver: bridge
