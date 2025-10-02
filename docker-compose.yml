@@ -19,7 +19,7 @@ services:
       context: .
       dockerfile: Dockerfile.nginx
     ports:
-      - "4000:4000"
+      - "5000:5000"
     volumes:
       - ./certs:/etc/nginx/certs:ro
     depends_on:
