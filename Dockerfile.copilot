@@ -11,4 +11,4 @@ ENV GITHUB_TOKEN=""
 ENV ACCOUNT_TYPE="enterprise"
 
 # Start the copilot-api service
-CMD npx copilot-api@latest start --port 4000 --github-token ${GITHUB_TOKEN} --account-type ${ACCOUNT_TYPE}
+CMD ["sh", "-c", "npx copilot-api@latest start --port 4000 --github-token ${GITHUB_TOKEN} --account-type ${ACCOUNT_TYPE}"]
