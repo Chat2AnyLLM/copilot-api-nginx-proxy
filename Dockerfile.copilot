@@ -1,7 +1,16 @@
 FROM ubuntu:latest
 
-# Install Node.js and npm
-RUN apt-get update && apt-get install -y nodejs npm && rm -rf /var/lib/apt/lists/*
+# Install prerequisites for nvm
+RUN apt-get update && apt-get install -y curl bash && rm -rf /var/lib/apt/lists/*
+
+# Install nvm and Node.js 22
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash && \
+    . "$HOME/.nvm/nvm.sh" && \
+    nvm install 22
+
+# Add nvm to PATH for subsequent commands
+ENV NVM_DIR="/root/.nvm"
+ENV PATH="$NVM_DIR/versions/node/v22.20.0/bin:$PATH"
 
 # Set working directory
 WORKDIR /app
