@@ -1,7 +1,7 @@
-FROM alpine:latest
+FROM ubuntu:latest
 
 # Install Node.js and npm
-RUN apk add --no-cache nodejs npm
+RUN apt-get update && apt-get install -y nodejs npm && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -11,4 +11,4 @@ ENV GITHUB_TOKEN=""
 ENV ACCOUNT_TYPE="enterprise"
 
 # Start the copilot-api service
-CMD ["sh", "-c", "npx copilot-api@latest start --port 5001 --github-token ${GITHUB_TOKEN} --account-type ${ACCOUNT_TYPE}"]
+CMD ["bash", "-c", "npx copilot-api@latest start --port 5001 --github-token ${GITHUB_TOKEN} --account-type ${ACCOUNT_TYPE}"]
