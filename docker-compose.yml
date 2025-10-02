@@ -7,6 +7,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.copilot
+    ports:
+      - "5001:5001"
     environment:
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - ACCOUNT_TYPE=enterprise
