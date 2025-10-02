@@ -1,4 +1,7 @@
-FROM nginx:alpine
+FROM ubuntu:latest
+
+# Install nginx
+RUN apt-get update && apt-get install -y nginx && rm -rf /var/lib/apt/lists/*
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
