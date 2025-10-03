@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Read(//var/log/nginx/**)",
-      "Bash(nginx:*)"
+      "Bash(nginx:*)",
+      "Bash(docker compose up:*)"
     ],
     "deny": [],
     "ask": []
