@@ -3,7 +3,11 @@
     "allow": [
       "Read(//var/log/nginx/**)",
       "Bash(nginx:*)",
-      "Bash(docker compose up:*)"
+      "Bash(docker compose up:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
