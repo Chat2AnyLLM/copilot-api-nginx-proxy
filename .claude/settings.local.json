@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Read(//var/log/nginx/**)"
+      "Read(//var/log/nginx/**)",
+      "Bash(nginx:*)"
     ],
     "deny": [],
     "ask": []
