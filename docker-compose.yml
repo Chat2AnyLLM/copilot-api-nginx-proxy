@@ -23,7 +23,7 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - ${HOST_CERTS_DIR}:/etc/nginx:ro
+      - ${HOST_CERTS_DIR}:/etc/nginx/certs:ro
     depends_on:
       - copilot-api
     networks:
