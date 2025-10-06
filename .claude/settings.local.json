@@ -7,7 +7,12 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git rev-parse:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "mcp__serena__switch_modes",
+      "mcp__serena__list_dir",
+      "mcp__serena__read_file",
+      "mcp__serena__create_text_file",
+      "mcp__serena__think_about_collected_information"
     ],
     "deny": [],
     "ask": []
