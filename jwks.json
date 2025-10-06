@@ -1,0 +1,12 @@
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "kid": "example-key-1",
+      "use": "sig",
+      "alg": "RS256",
+      "n": "sXchWfFQH8aE1LtjZJ_XjH2-TkFMiHnb-rD1iOqKy4uExampleBase64UrlModulusReplaceMe",
+      "e": "AQAB"
+    }
+  ]
+}
