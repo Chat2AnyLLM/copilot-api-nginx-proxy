@@ -109,6 +109,43 @@ flowchart TD
   K --> M
 ```
 
+```mermaid
+sequenceDiagram
+  participant Client
+  participant Nginx
+  participant Verifier
+  participant Upstream
+
+  Client->>Nginx: HTTPS request (Authorization header)
+  Nginx->>Verifier: auth_request /verify (forwards headers)
+  Verifier->>Verifier: Extract token from header
+  alt Token is JWT
+    Verifier->>Verifier: Load local JWKS and find key by kid
+    Verifier->>Verifier: Verify signature and claims (exp/aud/iss)
+    Verifier-->>Nginx: 200 OK (user=sub)
+  else Token is API key
+    Verifier->>Verifier: Check PLAINTEXT_KEYS
+    alt Plaintext match
+      Verifier-->>Nginx: 200 OK
+    else
+      Verifier->>Verifier: Check BCRYPT_HASHED via bcrypt.checkpw
+      alt Bcrypt match
+        Verifier-->>Nginx: 200 OK (user)
+      else
+        Verifier-->>Nginx: 401 Invalid API key
+      end
+    end
+  end
+
+  alt Verifier returned 200
+    Nginx->>Upstream: Proxy request to upstream
+    Upstream-->>Nginx: Response
+    Nginx-->>Client: Response
+  else Verifier returned 401/500
+    Nginx-->>Client: 401/500 error
+  end
+```
+
 Notes:
 - JWKS must contain only public key material. For local-only setups place `jwks.json` in the repo root or mount it at `/certs/jwks.json`.
 - Configure `JWT_AUDIENCE` and `JWT_ISSUER` for claim checks when issuing tokens.
