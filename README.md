@@ -4,37 +4,48 @@ A small nginx reverse-proxy configuration and Docker Compose setup for running a
 
 Features
 - TLS-terminating nginx proxy
+- Authentication gateway (auth_request) that delegates API key / JWT validation to a lightweight Python verifier service
 - Secure upstream TLS to the copilot-api service
 - Docker Compose for local development and deployment
 
 Requirements
 - Docker and Docker Compose
+- A GitHub token if you run the embedded `copilot-api` builder (set `GITHUB_TOKEN`)
 
 Quickstart
-1. Copy the example environment file if present and adjust values:
+1. Copy the example environment file and set values:
    cp .env.example .env
+   Edit `.env` and populate the required variables described below.
 2. Start the services:
-   docker compose up -d
+   docker compose up -d --build
 3. Verify the proxy is serving HTTPS (adjust host/port as configured):
-   curl -vk https://localhost/
+   curl -vk https://localhost:5000/
 
 Configuration
-Set the following environment variables or mount equivalent files into the nginx container:
-- COPILOT_API_HOST: upstream host (default: copilot_api:4111)
-- PROXY_PORT: port nginx listens on (default: 443)
-- TLS_CERT_PATH, TLS_KEY_PATH: filesystem paths to TLS certificate and key inside the container
+This repository composes three main services:
+- `copilot-api` — the upstream Copilot API service (built from `Dockerfile.copilot`).
+- `verifier` — small FastAPI app that validates incoming requests using either API keys or JWT/JWKS.
+- `nginx` — TLS-terminating reverse proxy that uses `auth_request` to call the `verifier` service.
 
-Self-signed certificates
-- If the upstream or proxy uses a self-signed certificate during development, Node.js clients may reject TLS connections. For local testing you can temporarily disable Node.js TLS verification by exporting:
+Environment variables are documented in `.env.example`. Important variables include:
+- `GITHUB_TOKEN` — required by the `copilot-api` builder if you run that service (set to a GitHub PAT with appropriate scopes).
+- `HOST_CERTS_DIR` — host directory mounted into Nginx at `/etc/nginx/certs` containing `copilot.crt` and `copilot.key`.
+- `JWKS_URL` — (optional) JWKS endpoint used by the `verifier` if you validate JWTs.
+- `JWKS_REFRESH_SECONDS` — (optional) how often the verifier refreshes JWKS.
+- `JWT_AUDIENCE` — (optional) expected JWT audience.
+- `API_KEY` / `SECRET_KEY` — API keys accepted by the `verifier` service. Provide at least one.
 
-  export NODE_TLS_REJECT_UNAUTHORIZED='0'
-
-  Use this only for local development and never in production.
+TLS / Certificates
+- Provide TLS cert and key files in the host path referenced by `HOST_CERTS_DIR`. They should be named `copilot.crt` and `copilot.key`.
+- For development you may use self-signed certs, but do not disable TLS verification in production. If testing with Node.js clients only, you can temporarily set `NODE_TLS_REJECT_UNAUTHORIZED=0` locally (not recommended for general use).
 
 Development
 - Tail logs during development:
-  docker compose logs -f nginx
-- Make configuration changes in nginx.conf and restart the nginx service.
+  docker compose logs -f nginx verifier copilot-api
+- The `verifier` service is implemented in `verifier.py`. It supports two verification modes:
+  - API key validation via `API_KEY` or `SECRET_KEY` environment variables.
+  - JWT validation via `JWKS_URL`, `JWKS_REFRESH_SECONDS`, and `JWT_AUDIENCE`.
+- Make configuration changes in `nginx.conf` and restart the nginx service.
 
 Contributing
 Contributions welcome. Open an issue or submit a pull request.
