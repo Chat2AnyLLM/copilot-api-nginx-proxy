@@ -42,10 +42,29 @@ TLS / Certificates
 Development
 - Tail logs during development:
   docker compose logs -f nginx verifier copilot-api
-- The `verifier` service is implemented in `verifier.py`. It supports two verification modes:
-  - API key validation via `API_KEY` or `SECRET_KEY` environment variables.
+- The `verifier` service is implemented in `verifier.py`. It supports multiple verification modes:
+  - Plaintext API keys via `API_KEY`, `SECRET_KEY`, or `API_KEYS` (comma-separated).
+  - Bcrypt-hashed keys loaded from `API_KEYS_FILE`. Lines may be `user:$2b$...` or a plaintext key.
   - JWT validation via `JWKS_URL`, `JWKS_REFRESH_SECONDS`, and `JWT_AUDIENCE`.
-- Make configuration changes in `nginx.conf` and restart the nginx service.
+
+Example `API_KEYS_FILE` entries (one per line):
+
+```
+alice:$2b$12$wV... (bcrypt hash of alice's key)
+bob:$2b$12$7Q...   (bcrypt hash of bob's key)
+# a plaintext key (not recommended in production)
+plainkey123
+```
+
+To generate a bcrypt hash locally (Python):
+
+```
+import bcrypt
+pw = b"my-secret-key"
+print(bcrypt.hashpw(pw, bcrypt.gensalt()).decode())
+```
+
+Make configuration changes in `nginx.conf` and restart the nginx service.
 
 Contributing
 Contributions welcome. Open an issue or submit a pull request.
