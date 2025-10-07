@@ -130,7 +130,12 @@ def jwk_to_pem(jwk_dict):
 
 
 def verify_jwt_token(token: str):
-    """Verify JWT using the local JWKS. Returns payload on success or raises JWTError."""
+    """Verify JWT using the local JWKS. Returns payload on success or raises JWTError.
+
+    Logging expanded to provide visibility into header parsing, selected JWK, and a
+    safe subset of claims (sub/aud/iss/exp/iat) on success. The raw JWT and any
+    sensitive claim values are intentionally not logged.
+    """
     # Load / refresh JWKS
     load_local_jwks()
     if not JWKS:
@@ -139,6 +144,7 @@ def verify_jwt_token(token: str):
 
     try:
         header = jwt.get_unverified_header(token)
+        logger.debug("Parsed JWT header keys: %s", list(header.keys()))
     except Exception:
         logger.exception("Failed to parse JWT header")
         raise JWTError("Malformed JWT header")
@@ -167,7 +173,9 @@ def verify_jwt_token(token: str):
             audience=audience if audience else None,
             issuer=issuer if issuer else None,
         )
-        logger.info("JWT verified successfully for kid %s subject %s", kid, payload.get("sub"))
+        # Log a safe, small set of claims for observability without exposing full token
+        safe_claims = {k: payload.get(k) for k in ("sub", "aud", "iss", "exp", "iat") if k in payload}
+        logger.info("JWT verified successfully for kid=%s subject=%s safe_claims=%s", kid, payload.get("sub"), safe_claims)
         return payload
     except Exception:
         logger.exception("JWT verification failed for kid %s", kid)
@@ -222,8 +230,12 @@ async def verify(request: Request):
     else:
         logger.debug("Using raw Authorization header as token")
 
+    # Record that the verifier received a request and the approximate token type
+    token_type = "jwt" if token.count('.') == 2 else "api_key"
+    logger.info("Received /verify request from %s with token_type=%s", request.client.host if request.client else "unknown", token_type)
+
     # If the token looks like a JWT (has two dots), try JWT verification first
-    if token.count('.') == 2:
+    if token_type == "jwt":
         logger.debug("Token appears to be a JWT, attempting JWT verification")
         try:
             payload = verify_jwt_token(token)
@@ -231,10 +243,10 @@ async def verify(request: Request):
             # prefer sub claim for user identification
             if isinstance(payload, dict) and payload.get("sub"):
                 content["user"] = payload.get("sub")
-            logger.info("JWT verification succeeded, returning 200")
+            logger.info("JWT verification succeeded, returning 200 for user=%s", content.get("user"))
             return JSONResponse(status_code=200, content=content)
         except JWTError:
-            logger.warning("JWT verification failed for token")
+            logger.warning("JWT verification failed for token; returning 401 to caller")
             # fall through to API key checks or fail explicitly
             raise HTTPException(status_code=401, detail="Invalid JWT")
 
@@ -244,8 +256,8 @@ async def verify(request: Request):
         content = {"status": "ok"}
         if user:
             content["user"] = user
-        logger.info("API key verification succeeded")
+        logger.info("API key verification succeeded for user=%s, returning 200", user)
         return JSONResponse(status_code=200, content=content)
 
-    logger.warning("API key verification failed")
+    logger.warning("API key verification failed, returning 401 to caller")
     raise HTTPException(status_code=401, detail="Invalid API key")
