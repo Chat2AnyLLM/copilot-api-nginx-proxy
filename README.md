@@ -90,22 +90,22 @@ Mermaid flowchart (added to README):
 
 ```mermaid
 flowchart TD
-  A[Client request<br/>(Authorization header)] --> B[Nginx auth_request -> /verify]
-  B --> C{Token contains '.' '.'?}
-  C -- Yes --> D[Verifier: load local JWKS<br/>find JWK by kid]
+  A["Client request\n(Authorization header)"] --> B["Nginx auth_request -> /verify"]
+  B --> C{Token contains two dots?}
+  C -- Yes --> D["Verifier: load local JWKS\nfind JWK by kid"]
   D --> E{Signature valid?}
-  E -- Yes --> F{Claims OK (aud/iss/exp)?}
-  F -- Yes --> G[200 OK<br/>(user = sub)]
-  F -- No --> H[401 Invalid JWT claims]
+  E -- Yes --> F{Claims OK\n(aud/iss/exp)?}
+  F -- Yes --> G["200 OK\n(user = sub)"]
+  F -- No --> H["401 Invalid JWT claims"]
   E -- No --> H
-  C -- No --> I[Verifier: check PLAINTEXT_KEYS]
+  C -- No --> I["Verifier: check PLAINTEXT_KEYS"]
   I -- Match --> G
-  I -- No --> J[Check BCRYPT_HASHED with bcrypt.checkpw]
+  I -- No --> J["Check BCRYPT_HASHED\nwith bcrypt.checkpw"]
   J -- Match --> G
-  J -- No --> K[401 Invalid API key]
+  J -- No --> K["401 Invalid API key"]
 
-  G --> L[Nginx allows request to upstream]
-  H --> M[Nginx denies request]
+  G --> L["Nginx allows request to upstream"]
+  H --> M["Nginx denies request"]
   K --> M
 ```
 
