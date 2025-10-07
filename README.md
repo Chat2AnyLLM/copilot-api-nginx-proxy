@@ -90,12 +90,12 @@ Mermaid flowchart (added to README):
 
 ```mermaid
 flowchart TD
-  A[Client request\n(Authorization header)] --> B[Nginx auth_request -> /verify]
+  A[Client request<br/>(Authorization header)] --> B[Nginx auth_request -> /verify]
   B --> C{Token contains '.' '.'?}
-  C -- Yes --> D[Verifier: load local JWKS\nfind JWK by kid]
+  C -- Yes --> D[Verifier: load local JWKS<br/>find JWK by kid]
   D --> E{Signature valid?}
   E -- Yes --> F{Claims OK (aud/iss/exp)?}
-  F -- Yes --> G[200 OK\n(user = sub)]
+  F -- Yes --> G[200 OK<br/>(user = sub)]
   F -- No --> H[401 Invalid JWT claims]
   E -- No --> H
   C -- No --> I[Verifier: check PLAINTEXT_KEYS]
