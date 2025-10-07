@@ -7,16 +7,15 @@ app = FastAPI()
 
 # Load API key configuration
 # Support:
-# - plain API_KEY / SECRET_KEY (legacy)
+# - plain API_KEY (single legacy var)
 # - API_KEYS (comma-separated plaintext keys)
 # - API_KEYS_FILE (file path with one entry per line; lines may be plain keys or "user:hashed_key")
 API_KEY = os.getenv("API_KEY", "")
-SECRET_KEY = os.getenv("SECRET_KEY", "")
 API_KEYS_CSV = os.getenv("API_KEYS", "")
 API_KEYS_FILE = os.getenv("API_KEYS_FILE", "")
 
 # Collections to hold plaintext keys and bcrypt-hashed entries
-PLAINTEXT_KEYS = {k for k in [API_KEY, SECRET_KEY] if k}
+PLAINTEXT_KEYS = {k for k in [API_KEY] if k}
 BCRYPT_HASHED = []  # list of (user, hashed_bytes)
 
 if API_KEYS_CSV:
