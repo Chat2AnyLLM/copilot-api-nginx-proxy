@@ -6,7 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     JWKS_REFRESH_SECONDS=3600 \
     JWT_AUDIENCE=your_audience_here
 
-RUN pip install --no-cache-dir fastapi uvicorn[standard] python-jose httpx
+RUN pip install --no-cache-dir fastapi uvicorn[standard] python-jose httpx bcrypt
 
 COPY verifier.py .
 COPY jwks.json .
