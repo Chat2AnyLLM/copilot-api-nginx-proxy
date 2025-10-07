@@ -9,9 +9,6 @@ services:
       dockerfile: Dockerfile.copilot
     expose:
       - "5001"
-    environment:
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - ACCOUNT_TYPE=enterprise
     networks:
       - copilot-network
     restart: unless-stopped
@@ -26,7 +23,6 @@ services:
       - "5002"
     environment:
       - API_KEY=${API_KEY}
-      - SECRET_KEY=${SECRET_KEY}
     networks:
       - copilot-network
     restart: unless-stopped
