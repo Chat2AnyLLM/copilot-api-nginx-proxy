@@ -67,6 +67,68 @@ JWKS_FALLBACK_PATHS = [JWKS_PATH, "/certs/jwks.json", "./jwks.json"]
 JWKS = None
 _JWKS_MTIME = None
 
+# Remote JWKS support (optional)
+import requests as _requests
+
+JWKS_URL = os.getenv("JWKS_URL", "").strip() or None
+JWKS_TTL = int(os.getenv("JWKS_TTL", "300"))  # seconds
+
+# Cached remote JWKS state
+_REMOTE_JWKS = None
+_REMOTE_JWKS_FETCHED_AT = None
+
+
+def _validate_jwks_structure(jwks_obj):
+    if not isinstance(jwks_obj, dict):
+        raise ValueError("JWKS not a JSON object")
+    keys = jwks_obj.get("keys")
+    if not isinstance(keys, list):
+        raise ValueError("JWKS missing 'keys' array")
+    for k in keys:
+        if not isinstance(k, dict) or "kid" not in k or "kty" not in k:
+            raise ValueError("Each JWK must be an object containing at least 'kid' and 'kty'")
+
+
+def _fetch_remote_jwks():
+    global _REMOTE_JWKS, _REMOTE_JWKS_FETCHED_AT
+    if not JWKS_URL:
+        return None
+    # Use cached until TTL expires
+    now = time.time()
+    if _REMOTE_JWKS and _REMOTE_JWKS_FETCHED_AT and (now - _REMOTE_JWKS_FETCHED_AT) < JWKS_TTL:
+        return _REMOTE_JWKS
+    # Only allow HTTPS URLs
+    if not JWKS_URL.lower().startswith("https://"):
+        logger.warning("JWKS_URL must use https://; ignoring %s", JWKS_URL)
+        return None
+    try:
+        resp = _requests.get(JWKS_URL, timeout=5)
+        resp.raise_for_status()
+        jwks_obj = resp.json()
+        _validate_jwks_structure(jwks_obj)
+        _REMOTE_JWKS = jwks_obj
+        _REMOTE_JWKS_FETCHED_AT = now
+        logger.info("Fetched JWKS from %s (keys=%d)", JWKS_URL, len(jwks_obj.get("keys", [])))
+        return _REMOTE_JWKS
+    except Exception:
+        logger.exception("Failed to fetch/validate JWKS from %s; using cached or local JWKS if available", JWKS_URL)
+        return _REMOTE_JWKS  # may be None or last-successful
+
+
+def ensure_jwks_loaded():
+    """Load JWKS from remote URL (cached) if configured, else local file(s)."""
+    global JWKS
+    # Prefer remote JWKS if configured
+    if JWKS_URL:
+        remote = _fetch_remote_jwks()
+        if remote:
+            JWKS = remote
+            return
+        # otherwise fall through to local file (cached or new load)
+    # local fallback (existing behavior)
+    load_local_jwks()
+
+
 
 def _find_existing_jwks_path():
     for p in JWKS_FALLBACK_PATHS:
@@ -137,7 +199,7 @@ def verify_jwt_token(token: str):
     sensitive claim values are intentionally not logged.
     """
     # Load / refresh JWKS
-    load_local_jwks()
+    ensure_jwks_loaded()
     if not JWKS:
         logger.warning("Attempt to verify JWT but no JWKS available")
         raise JWTError("No JWKS available")
@@ -189,7 +251,7 @@ async def healthz():
     if BCRYPT_HASHED:
         methods.append("bcrypt")
     # JWT support is active if a JWKS file exists
-    load_local_jwks()
+    ensure_jwks_loaded()
     if JWKS:
         methods.append("jwt/jwks")
     return {"status": "ok", "auth_methods": methods}
