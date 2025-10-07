@@ -21,8 +21,8 @@ services:
       dockerfile: verifier.Dockerfile
     expose:
       - "5002"
-    environment:
-      - API_KEY=${API_KEY}
+    volumes:
+      - ${API_KEYS_FILE_HOST}:${API_KEYS_FILE_CONTAINER}:ro
     networks:
       - copilot-network
     restart: unless-stopped
