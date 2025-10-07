@@ -63,6 +63,59 @@ print(bcrypt.hashpw(pw, bcrypt.gensalt()).decode())
 
 Make configuration changes in `nginx.conf` and restart the nginx service.
 
+Authentication flow (new verifier implementation)
+
+When a client sends an authenticated request the flow is:
+
+1. Client -> Nginx
+   - Client calls the proxied API and includes credentials in the Authorization header (either `Bearer <token>` or raw `<token>`).
+2. Nginx -> Verifier (auth_request)
+   - Nginx calls the verifier's `/verify` endpoint and forwards the Authorization header.
+3. Verifier extracts token
+   - If header starts with `Bearer `, the token portion is extracted.
+4. Verifier decides path
+   - If token looks like a JWT (contains two dots):
+     a. Load local JWKS (prefers `JWKS_PATH` or `/certs/jwks.json`).
+     b. Parse JWT header, find `kid` in JWKS, convert JWK -> PEM, verify signature and claims (`exp`, `aud`, `iss`).
+     c. On success return 200 with optional `user` set from `sub` claim.
+     d. On failure return 401.
+   - Else (not a JWT):
+     a. Check plaintext API keys (from `API_KEY`, `API_KEYS`, or plaintext lines in `API_KEYS_FILE`).
+     b. If not found, iterate bcrypt hashes from `API_KEYS_FILE` and run `bcrypt.checkpw`. If matched, return 200 and include associated user if present.
+     c. If no match, return 401.
+5. Nginx enforces result
+   - Nginx allows the proxied request to proceed to upstream on 200. On 401/500 it denies the request.
+
+Mermaid flowchart (added to README):
+
+```mermaid
+flowchart TD
+  A[Client request\n(Authorization header)] --> B[Nginx auth_request -> /verify]
+  B --> C{Token contains '.' '.'?}
+  C -- Yes --> D[Verifier: load local JWKS\nfind JWK by kid]
+  D --> E{Signature valid?}
+  E -- Yes --> F{Claims OK (aud/iss/exp)?}
+  F -- Yes --> G[200 OK\n(user = sub)]
+  F -- No --> H[401 Invalid JWT claims]
+  E -- No --> H
+  C -- No --> I[Verifier: check PLAINTEXT_KEYS]
+  I -- Match --> G
+  I -- No --> J[Check BCRYPT_HASHED with bcrypt.checkpw]
+  J -- Match --> G
+  J -- No --> K[401 Invalid API key]
+
+  G --> L[Nginx allows request to upstream]
+  H --> M[Nginx denies request]
+  K --> M
+```
+
+Notes:
+- JWKS must contain only public key material. For local-only setups place `jwks.json` in the repo root or mount it at `/certs/jwks.json`.
+- Configure `JWT_AUDIENCE` and `JWT_ISSUER` for claim checks when issuing tokens.
+- The verifier will auto-reload `jwks.json` when the file mtime changes.
+
+
+
 Contributing
 Contributions welcome. Open an issue or submit a pull request.
 

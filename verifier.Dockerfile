@@ -3,7 +3,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-RUN pip install --no-cache-dir fastapi uvicorn[standard] python-jose httpx bcrypt
+RUN pip install --no-cache-dir fastapi uvicorn[standard] python-jose httpx bcrypt jwcrypto
 
 COPY verifier.py .
 COPY jwks.json .
