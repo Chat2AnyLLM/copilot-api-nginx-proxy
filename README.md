@@ -30,10 +30,7 @@ This repository composes three main services:
 Environment variables are documented in `.env.example`. Important variables include:
 - `GITHUB_TOKEN` — required by the `copilot-api` builder if you run that service (set to a GitHub PAT with appropriate scopes).
 - `HOST_CERTS_DIR` — host directory mounted into Nginx at `/etc/nginx/certs` containing `copilot.crt` and `copilot.key`.
-- `JWKS_URL` — (optional) JWKS endpoint used by the `verifier` if you validate JWTs.
-- `JWKS_REFRESH_SECONDS` — (optional) how often the verifier refreshes JWKS.
-- `JWT_AUDIENCE` — (optional) expected JWT audience.
-- `API_KEY` / `SECRET_KEY` — API keys accepted by the `verifier` service. Provide at least one.
+- `API_KEY` — API key accepted by the `verifier` service. Provide at least one.
 
 TLS / Certificates
 - Provide TLS cert and key files in the host path referenced by `HOST_CERTS_DIR`. They should be named `copilot.crt` and `copilot.key`.
@@ -43,7 +40,7 @@ Development
 - Tail logs during development:
   docker compose logs -f nginx verifier copilot-api
 - The `verifier` service is implemented in `verifier.py`. It supports multiple verification modes:
-  - Plaintext API keys via `API_KEY`, `SECRET_KEY`, or `API_KEYS` (comma-separated).
+  - Plaintext API keys via `API_KEY` or `API_KEYS` (comma-separated).
   - Bcrypt-hashed keys loaded from `API_KEYS_FILE`. Lines may be `user:$2b$...` or a plaintext key.
   - JWT validation via `JWKS_URL`, `JWKS_REFRESH_SECONDS`, and `JWT_AUDIENCE`.
 
