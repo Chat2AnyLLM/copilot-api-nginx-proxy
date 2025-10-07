@@ -91,10 +91,10 @@ Mermaid flowchart (added to README):
 ```mermaid
 flowchart TD
   A["Client request\n(Authorization header)"] --> B["Nginx auth_request -> /verify"]
-  B --> C{Token contains two dots?}
+  B --> C{Token has two dots?}
   C -- Yes --> D["Verifier: load local JWKS\nfind JWK by kid"]
   D --> E{Signature valid?}
-  E -- Yes --> F{Claims OK\n(aud/iss/exp)?}
+  E -- Yes --> F{Claims OK?}
   F -- Yes --> G["200 OK\n(user = sub)"]
   F -- No --> H["401 Invalid JWT claims"]
   E -- No --> H
