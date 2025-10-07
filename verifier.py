@@ -191,6 +191,105 @@ def jwk_to_pem(jwk_dict):
         raise
 
 
+def _find_existing_jwks_path():
+    # The original _find_existing_jwks_path implementation remains above; this placeholder
+    # ensures our helper functions are located after jwk_to_pem in the file.
+    pass
+
+
+def _find_private_jwk():
+    """Return the first JWK in the loaded JWKS that contains private key material (e.g. 'd' for RSA/EC or 'k' for oct).
+    Returns None if no private JWK is available.
+    """
+    ensure_jwks_loaded()
+    if not JWKS:
+        logger.debug("No JWKS loaded when searching for a private JWK")
+        return None
+    for k in JWKS.get("keys", []):
+        # RFC7517 private parameters: RSA has 'd', EC has 'd', symmetric keys ('oct') have 'k'
+        if isinstance(k, dict) and ("d" in k or (k.get("kty") == "oct" and "k" in k)):
+            logger.info("Found private JWK for kid=%s", k.get("kid"))
+            return k
+    logger.info("No private JWK found in JWKS")
+    return None
+
+
+def jwk_to_private_pem(jwk_dict):
+    """Convert a private JWK dict to a PEM-encoded private key (bytes).
+    Uses jwcrypto to perform the conversion. Raises on failure.
+    """
+    try:
+        jw = jwcrypto_jwk.JWK.from_json(json.dumps(jwk_dict))
+        pem = jw.export_to_pem(private_key=True, password=None)
+        logger.debug("Converted private JWK (kid=%s) to PEM, len=%d", jwk_dict.get('kid'), len(pem))
+        return pem
+    except Exception:
+        logger.exception("Failed to convert private JWK to PEM for kid %s", jwk_dict.get('kid'))
+        raise
+
+
+@app.post("/token")
+async def mint_token(request: Request):
+    """Mint a short-lived JWT for a validated API key.
+
+    Clients present an API key in the Authorization header (Bearer <api_key> or raw <api_key>).
+    If the key validates (plaintext or bcrypt), the server will sign a JWT using a private
+    JWK from the loaded jwks.json. The endpoint prefers an existing private JWK; if none
+    is available it returns a 500 error.
+    """
+    auth_header = request.headers.get("authorization")
+    if not auth_header:
+        logger.warning("Missing Authorization header in /token request")
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+
+    token = auth_header
+    if auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1]
+
+    ok, user = check_token(token)
+    if not ok:
+        logger.info("Unauthorized attempt to mint token")
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+    # subject: prefer user from bcrypt file, else mark as api_key
+    subject = user if user else "api_key"
+
+    # Build claims
+    now = int(time.time())
+    ttl = int(os.getenv("JWT_TTL", "3600"))  # seconds
+    payload = {"sub": subject, "iat": now, "exp": now + ttl}
+    audience = os.getenv("JWT_AUDIENCE")
+    issuer = os.getenv("JWT_ISSUER")
+    if audience:
+        payload["aud"] = audience
+    if issuer:
+        payload["iss"] = issuer
+
+    # Find a private key to sign with
+    private_jwk = _find_private_jwk()
+    if not private_jwk:
+        logger.warning("No private JWK available to sign token; deny /token request")
+        raise HTTPException(status_code=500, detail="No signing key available")
+
+    alg = private_jwk.get("alg", "RS256")
+    kid = private_jwk.get("kid")
+    try:
+        private_pem = jwk_to_private_pem(private_jwk)
+    except Exception:
+        logger.exception("Failed to obtain PEM for private JWK kid=%s", kid)
+        raise HTTPException(status_code=500, detail="Failed to prepare signing key")
+
+    # Encode JWT with kid header
+    headers = {"kid": kid} if kid else None
+    try:
+        signed = jwt.encode(payload, private_pem, algorithm=alg, headers=headers)
+        logger.info("Minted JWT for subject=%s kid=%s exp=%s", subject, kid, payload.get("exp"))
+        return JSONResponse(status_code=200, content={"token": signed, "expires_in": ttl, "kid": kid, "alg": alg})
+    except Exception:
+        logger.exception("Failed to sign JWT for subject=%s", subject)
+        raise HTTPException(status_code=500, detail="Failed to sign token")
+
+
 def verify_jwt_token(token: str):
     """Verify JWT using the local JWKS. Returns payload on success or raises JWTError.
 
