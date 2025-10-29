@@ -2,3 +2,5 @@
 *.claude/*
 .claude/*
 __pycache__
+certs/
+api_keys.txt
