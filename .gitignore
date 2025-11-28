@@ -4,3 +4,4 @@
 __pycache__
 certs/
 api_keys.txt
+certs/*
