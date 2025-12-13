@@ -2,6 +2,8 @@ import os
 import json
 import time
 import bcrypt
+import hmac
+from collections import defaultdict
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 
@@ -15,6 +17,37 @@ logging.basicConfig(level=os.getenv("VERIFIER_LOG_LEVEL", "INFO"))
 logger = logging.getLogger("verifier")
 
 app = FastAPI()
+
+# Allowed JWT algorithms to prevent algorithm confusion attacks
+ALLOWED_JWT_ALGORITHMS = {"RS256", "RS384", "RS512", "ES256", "ES384", "ES512", "PS256", "PS384", "PS512"}
+
+# Rate limiting has been disabled
+# rate_limits = defaultdict(list)
+#
+# def check_rate_limit(client_ip: str, endpoint: str, max_requests: int = 10, window: int = 60):
+#     """Simple in-memory rate limiting. Replace with Redis for production."""
+#     now = time.time()
+#     key = f"{client_ip}:{endpoint}"
+#
+#     # Clean old requests
+#     rate_limits[key] = [req_time for req_time in rate_limits[key] if now - req_time < window]
+#
+#     if len(rate_limits[key]) >= max_requests:
+#         return False
+#
+#     rate_limits[key].append(now)
+#     return True
+#
+# @app.middleware("http")
+# async def rate_limit_middleware(request: Request, call_next):
+#     client_ip = request.client.host if request.client else "unknown"
+#
+#     if request.url.path in ["/verify", "/token"]:
+#         if not check_rate_limit(client_ip, request.url.path, max_requests=5, window=60):
+#             return JSONResponse(status_code=429, content={"error": "Too many requests"})
+#
+#     response = await call_next(request)
+#     return response
 
 # Load API key configuration
 # Support:
@@ -314,6 +347,11 @@ def verify_jwt_token(token: str):
     alg = header.get("alg", "RS256")
     logger.debug("Verifying JWT with kid=%s alg=%s", kid, alg)
 
+    # Validate algorithm against whitelist to prevent algorithm confusion attacks
+    if alg not in ALLOWED_JWT_ALGORITHMS:
+        logger.warning("Unsupported or dangerous JWT algorithm: %s", alg)
+        raise JWTError(f"Unsupported algorithm: {alg}")
+
     jwk_entry = _get_jwk_for_kid(kid)
     if not jwk_entry:
         logger.warning("No JWK found for kid %s", kid)
@@ -330,7 +368,7 @@ def verify_jwt_token(token: str):
         payload = jwt.decode(
             token,
             public_pem,
-            algorithms=[alg],
+            algorithms=list(ALLOWED_JWT_ALGORITHMS),  # Use full whitelist instead of single algorithm
             audience=audience if audience else None,
             issuer=issuer if issuer else None,
         )
@@ -357,19 +395,21 @@ async def healthz():
 
 
 def check_token(token: str):
-    # exact match plaintext
-    if token in PLAINTEXT_KEYS:
-        logger.debug("Plaintext key matched")
-        return True, None
+    # exact match plaintext with constant-time comparison
+    token_bytes = token.encode('utf-8')
+    for key in PLAINTEXT_KEYS:
+        key_bytes = key.encode('utf-8')
+        if hmac.compare_digest(token_bytes, key_bytes):
+            logger.debug("Plaintext key matched")
+            return True, None
 
-    # check bcrypt hashes
+    # check bcrypt hashes (already constant-time)
     for user, hashed in BCRYPT_HASHED:
         try:
-            if bcrypt.checkpw(token.encode(), hashed):
+            if bcrypt.checkpw(token_bytes, hashed):
                 logger.info("Bcrypt key matched for user %s", user)
                 return True, user
         except Exception:
-            # ignore malformed hash entries
             logger.exception("Malformed bcrypt hash for user %s", user)
             continue
     logger.debug("No API key match found")

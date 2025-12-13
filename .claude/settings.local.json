@@ -12,7 +12,11 @@
       "mcp__serena__list_dir",
       "mcp__serena__read_file",
       "mcp__serena__create_text_file",
-      "mcp__serena__think_about_collected_information"
+      "mcp__serena__think_about_collected_information",
+      "Bash(git stash:*)",
+      "Bash(docker compose logs:*)",
+      "Bash(docker compose config:*)",
+      "Bash(docker compose ps:*)"
     ],
     "deny": [],
     "ask": []
