@@ -28,6 +28,8 @@ services:
     restart: unless-stopped
 
   nginx:
+    env_file:
+      - .env
     build:
       context: .
       dockerfile: Dockerfile.nginx
