@@ -16,7 +16,10 @@
       "Bash(git stash:*)",
       "Bash(docker compose logs:*)",
       "Bash(docker compose config:*)",
-      "Bash(docker compose ps:*)"
+      "Bash(docker compose ps:*)",
+      "Bash(pip install:*)",
+      "Bash(unset:*)",
+      "Bash(API_KEYS_FILE=api_keys.txt python:*)"
     ],
     "deny": [],
     "ask": []
