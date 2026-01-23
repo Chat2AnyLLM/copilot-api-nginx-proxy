@@ -1,0 +1,52 @@
+FROM oven/bun:latest AS builder
+
+# Install git to clone the repository
+RUN apt-get update && apt-get install -y git curl
+
+# Set working directory
+WORKDIR /app
+
+# Clone the copilot-api repository
+RUN git clone https://github.com/ericc-ch/copilot-api.git .
+
+# Install dependencies using bun
+RUN bun install
+
+# Build the project
+RUN bun run build || echo "No build script found, continuing..."
+
+# Production stage
+FROM oven/bun:slim
+
+# Install curl for health check
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r copilot && useradd -r -g copilot copilot
+
+# Create the home directory for the copilot user and set proper permissions
+RUN mkdir -p /home/copilot && chown -R copilot:copilot /home/copilot
+
+# Set working directory
+WORKDIR /app
+
+# Copy built application from builder stage
+COPY --from=builder /app /app
+
+# Change ownership to non-root user
+RUN chown -R copilot:copilot /app
+USER copilot
+
+# Accept GitHub token as environment variable
+ENV GITHUB_TOKEN=""
+ENV ACCOUNT_TYPE="enterprise"
+
+# Expose the port
+EXPOSE 5001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:5001/health || exit 1
+
+# Start the copilot-api service on port 5001
+CMD ["sh", "-c", "bun run ./src/main.ts start --port 5001 --github-token \"$GITHUB_TOKEN\" --account-type \"$ACCOUNT_TYPE\""]
