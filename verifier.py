@@ -418,9 +418,25 @@ def check_token(token: str):
 
 @app.get("/verify")
 async def verify(request: Request):
+    # First check for x-api-key header (treat as API key only)
+    api_key_header = request.headers.get("x-api-key")
+    if api_key_header:
+        logger.debug("Found x-api-key header, treating as API key")
+        ok, user = check_token(api_key_header)
+        if ok:
+            content = {"status": "ok"}
+            if user:
+                content["user"] = user
+            logger.info("x-api-key verification succeeded for user=%s, returning 200", user)
+            return JSONResponse(status_code=200, content=content)
+        else:
+            logger.warning("x-api-key verification failed, returning 401 to caller")
+            raise HTTPException(status_code=401, detail="Invalid API key")
+
+    # Fall back to Authorization header (existing logic)
     auth_header = request.headers.get("authorization")
     if not auth_header:
-        logger.warning("Missing Authorization header in request")
+        logger.warning("Missing Authorization header in request (and no x-api-key header)")
         raise HTTPException(status_code=401, detail="Missing Authorization header")
 
     # Support both "Bearer <key>" and "Authorization: <key>" formats
