@@ -11,23 +11,41 @@ Features
 - Remote JWKS support with automatic fetching and caching
 - Enhanced rate limiting at the nginx level
 - Improved security with constant-time comparisons and algorithm whitelisting
+- **NEW**: Flexible image building from copilot-api source repository (instead of using npx)
 
-Requirements
-- Docker and Docker Compose
-- A GitHub token if you run the embedded `copilot-api` builder (set `GITHUB_TOKEN`)
+## Building from Source
 
-Quickstart
+This repository now supports building the `copilot-api` service directly from the source code instead of using npx. The Dockerfile (`Dockerfile.copilot.fromrepo`) implements a multi-stage build that:
+
+- Clones the copilot-api repository from https://github.com/ericc-ch/copilot-api
+- Builds the project using bun
+- Creates a production image with a non-root user
+- Includes health checks
+
+This approach provides greater flexibility to customize the copilot-api behavior and allows you to use your own modifications to the source code.
+
+## Quickstart
+
 1. Copy the example environment file and set values:
+   ```bash
    cp .env.example .env
+   ```
    Edit `.env` and populate the required variables described below.
-2. Start the services:
-   docker compose up -d --build
-3. Verify the proxy is serving HTTPS (adjust host/port as configured):
-   curl -vk https://localhost:5000/
 
-Configuration
+2. Start the services:
+   ```bash
+   docker compose up -d --build
+   ```
+
+3. Verify the proxy is serving HTTPS (adjust host/port as configured):
+   ```bash
+   curl -vk https://localhost:5000/
+   ```
+
+## Configuration
+
 This repository composes three main services:
-- `copilot-api` — the upstream Copilot API service (built from `Dockerfile.copilot`).
+- `copilot-api` — the upstream Copilot API service (now built from `Dockerfile.copilot.fromrepo`).
 - `verifier` — small FastAPI app that validates incoming requests using either API keys or JWT/JWKS.
 - `nginx` — TLS-terminating reverse proxy that uses `auth_request` to call the `verifier` service.
 

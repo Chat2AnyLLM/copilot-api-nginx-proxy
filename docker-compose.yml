@@ -6,7 +6,7 @@ services:
       - .env
     build:
       context: .
-      dockerfile: Dockerfile.copilot
+      dockerfile: Dockerfile.copilot.fromrepo
     expose:
       - "5001"
     networks:
