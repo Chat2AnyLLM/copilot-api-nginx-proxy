@@ -26,21 +26,146 @@ This approach provides greater flexibility to customize the copilot-api behavior
 
 ## Quickstart
 
-1. Copy the example environment file and set values:
-   ```bash
-   cp .env.example .env
-   ```
-   Edit `.env` and populate the required variables described below.
+### Prerequisites
 
-2. Start the services:
-   ```bash
-   docker compose up -d --build
-   ```
+Before you begin, ensure you have:
+- Docker and Docker Compose installed
+- A GitHub Personal Access Token (PAT) with appropriate scopes
+- TLS certificates (or generate self-signed certs for testing)
+- At least one API key configured
 
-3. Verify the proxy is serving HTTPS (adjust host/port as configured):
-   ```bash
-   curl -vk https://localhost:5000/
-   ```
+### Step-by-Step Setup
+
+#### 1. Clone the Repository
+
+```bash
+git clone https://github.com/yourusername/copilot-api-nginx-proxy.git
+cd copilot-api-nginx-proxy
+```
+
+#### 2. Generate TLS Certificates
+
+For development/testing, generate self-signed certificates:
+
+```bash
+mkdir -p certs
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout certs/copilot.key \
+  -out certs/copilot.crt \
+  -subj "/CN=localhost"
+```
+
+For production, use certificates from a trusted Certificate Authority (Let's Encrypt, etc.).
+
+#### 3. Configure Environment Variables
+
+Copy the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and configure the following **required** variables:
+
+```bash
+# GitHub token for copilot-api (required)
+GITHUB_TOKEN=ghp_YOUR_ACTUAL_TOKEN_HERE
+
+# Path to your certificates directory (required)
+HOST_CERTS_DIR=/absolute/path/to/certs
+
+# API key for authentication (required - choose one method)
+API_KEY=your-secure-api-key-here
+
+# OR use a file with bcrypt-hashed keys (recommended for production)
+API_KEYS_FILE_HOST=/absolute/path/to/api_keys.txt
+API_KEYS_FILE_CONTAINER=/app/verifier/api_keys.txt
+```
+
+**Optional but recommended variables:**
+
+```bash
+# JWT configuration (if using JWT tokens)
+JWT_TTL=3600
+JWT_AUDIENCE=copilot-api
+JWT_ISSUER=your-service-name
+
+# Rate limiting (recommended for production)
+RATE_LIMIT_API=10r/s
+RATE_LIMIT_API_BURST=20
+RATE_LIMIT_AUTH=5r/m
+RATE_LIMIT_AUTH_BURST=10
+```
+
+#### 4. Create API Keys File (Optional)
+
+If using bcrypt-hashed keys (recommended), create an `api_keys.txt` file:
+
+```bash
+# Generate a bcrypt hash for your API key
+python3 tools/hash_key.py "your-secret-api-key"
+# Output: $2b$12$XYZ...
+
+# Add to api_keys.txt (format: username:hash or just hash)
+echo "alice:$2b$12$XYZ..." > api_keys.txt
+```
+
+#### 5. Start the Services
+
+Build and start all containers:
+
+```bash
+docker compose up -d --build
+```
+
+This will:
+- Build the copilot-api service from source
+- Build the verifier authentication service
+- Build and configure the nginx reverse proxy
+- Start all services in detached mode
+
+#### 6. Verify the Deployment
+
+Check that all services are running:
+
+```bash
+docker compose ps
+```
+
+Expected output:
+```
+NAME                              STATUS              PORTS
+copilot-api-nginx-proxy-nginx-1   Up                  0.0.0.0:5000->5000/tcp
+copilot-api-nginx-proxy-verifier-1 Up                 5002/tcp
+copilot-api-nginx-proxy-copilot-api-1 Up              5001/tcp
+```
+
+Test the health endpoint (no authentication required):
+
+```bash
+curl -k https://localhost:5000/health
+```
+
+Test an authenticated endpoint:
+
+```bash
+curl -k https://localhost:5000/v1/models \
+  -H "Authorization: Bearer your-api-key"
+```
+
+#### 7. View Logs
+
+Monitor service logs in real-time:
+
+```bash
+# All services
+docker compose logs -f
+
+# Specific service
+docker compose logs -f nginx
+docker compose logs -f verifier
+docker compose logs -f copilot-api
+```
 
 ## Configuration
 
@@ -271,10 +396,129 @@ Security features:
 - JWKS structure is validated before use
 - Algorithm whitelisting prevents algorithm confusion attacks
 
+## Usage Examples
 
+### Basic API Calls
 
-Contributing
+Using API key authentication:
+
+```bash
+# With Bearer prefix
+curl -k https://localhost:5000/v1/completions \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "gpt-4", "prompt": "Hello"}'
+
+# Using x-api-key header
+curl -k https://localhost:5000/v1/models \
+  -H "x-api-key: your-api-key"
+```
+
+### JWT Token Workflow
+
+Exchange API key for JWT and use it:
+
+```bash
+# Get JWT token
+TOKEN=$(curl -sk -X POST https://localhost:5000/token \
+  -H "Authorization: Bearer your-api-key" | jq -r '.token')
+
+# Use JWT for requests
+curl -k https://localhost:5000/v1/completions \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "gpt-4", "prompt": "Hello"}'
+```
+
+### Managing API Keys
+
+```bash
+# Generate bcrypt hash for new key
+python3 tools/hash_key.py "new-secret-key"
+
+# Add to api_keys.txt with username
+echo "username:$2b$12$..." >> api_keys.txt
+
+# Restart verifier to reload keys
+docker compose restart verifier
+```
+
+## Troubleshooting
+
+### Certificate Issues
+
+```bash
+# Verify certificate validity
+openssl x509 -in certs/copilot.crt -text -noout -dates
+
+# Test TLS connection
+openssl s_client -connect localhost:5000 -servername localhost
+```
+
+### Authentication Problems
+
+```bash
+# Check verifier logs for auth attempts
+docker compose logs verifier | grep "verification"
+
+# Test verifier health
+docker compose exec verifier curl http://localhost:5002/healthz
+
+# Verify API key configuration
+docker compose exec verifier printenv | grep API_KEY
+```
+
+### Service Not Starting
+
+```bash
+# View detailed logs
+docker compose logs [service-name]
+
+# Check for port conflicts
+sudo netstat -tulpn | grep 5000
+
+# Rebuild from scratch
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+```
+
+### Rate Limiting
+
+```bash
+# Check current rate limit config
+docker compose exec nginx cat /etc/nginx/nginx.conf | grep limit_req
+
+# Adjust in .env and restart
+docker compose restart nginx
+```
+
+## Best Practices
+
+**Security:**
+- Use bcrypt-hashed keys in production, never plaintext
+- Obtain CA-signed certificates for production environments
+- Enable rate limiting to prevent abuse
+- Rotate API keys and certificates regularly
+- Monitor authentication logs for suspicious activity
+
+**Performance:**
+- Adjust rate limits based on your traffic patterns
+- Use JWT tokens to reduce authentication overhead
+- Monitor resource usage and scale accordingly
+- Consider using Redis for distributed rate limiting
+
+**Deployment:**
+- Use separate `.env` files for dev/staging/production
+- Implement proper secrets management (Docker secrets, Vault, etc.)
+- Set up monitoring and alerting (Prometheus, Grafana)
+- Configure resource limits in docker-compose.yml
+- Implement automated backups of certificates and configs
+
+## Contributing
+
 Contributions welcome. Open an issue or submit a pull request.
 
-License
+## License
+
 MIT

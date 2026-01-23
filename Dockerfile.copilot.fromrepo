@@ -46,7 +46,7 @@ EXPOSE 5001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:5001/health || exit 1
+  CMD curl -f http://localhost:5001/v1/models || exit 1
 
 # Start the copilot-api service on port 5001
 CMD ["sh", "-c", "bun run ./src/main.ts start --port 5001 --github-token \"$GITHUB_TOKEN\" --account-type \"$ACCOUNT_TYPE\""]
